@@ -4,9 +4,10 @@
 This workflow constructs phylogenetic analyses for RSV genomes with G gene excluded and included.
 Thus, the impact of the G gene on the tree structure can be visualised. 
 
+
 ### Input Data
 
-The worklfow takes as input RSV sequences (fasta), metadata (tsv), as well as references (gbk and fasta).
+The workflow takes as input RSV sequences (fasta), metadata (tsv), as well as references (gbk and fasta).
 
 ### Output Data
 
@@ -19,3 +20,7 @@ These two trees are constructed based on the same data, and thus tanglegrams com
 This workflow can be run from the command line: snakemake --cores all.
 
 Builds of interest can be specified in the configfile.yaml in the config folder. These are available for RSV-A and RSV-B.
+
+The workflow steps are the following:
+
+![Model](https://github.com/LauraU123/without_G_vs_with/blob/master/config/G-vs-rest-workflow.png)

@@ -1,5 +1,5 @@
 def get_node_data(w):
-    node_data = [rules.refine.output.node_data,
+    node_data = [rules.branch_lengths.output.node_data,
                     rules.clades.output.node_data,
                     rules.traits.output.node_data,
                     rules.ancestral.output.node_data,
@@ -9,7 +9,7 @@ def get_node_data(w):
 rule export:
     message: "Exporting data files for auspice"
     input:
-        tree = rules.refine.output.tree,
+        tree =  build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_resolve.nwk",
         metadata = rules.traits.input.metadata,
         node_data = get_node_data,
         auspice_config = config["files"]["auspice_config"],

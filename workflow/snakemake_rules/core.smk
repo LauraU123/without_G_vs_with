@@ -56,7 +56,8 @@ rule filter:
         sequences = "data/{a_or_b}/sequences.fasta",
         reference = "config/{a_or_b}reference.gbk",
         metadata = "data/{a_or_b}/metadata.tsv",
-        sequence_index = rules.index_sequences.output
+        sequence_index = rules.index_sequences.output,
+        exclude = config['exclude']
     output:
     	sequences = build_dir + "/{a_or_b}/{build_name}/filtered.fasta"
     params:
@@ -72,7 +73,7 @@ rule filter:
             --metadata {input.metadata} \
             --output {output.sequences} \
             --group-by {params.group_by} \
-            --exclude {params.strains} \
+            --exclude {input.exclude} \
             --subsample-max-sequences {params.subsample_max_sequences} \
             --min-length {params.min_length}
         """
@@ -191,12 +192,38 @@ rule tree_with_G:
         """
 
 
+rule refine:
+    message:
+        """
+        Refining tree
+        """
+    input:
+        tree = build_dir + "/{a_or_b}/{build_name}/tree_raw_{with_or_without}.nwk",
+        alignment = rules.tree.input.alignment,
+        metadata = rules.filter.input.metadata
+    output:
+        tree = build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_refined.nwk"
+    params:
+        coalescent = config["refine"]["coalescent"],
+        clock_filter_iqd = config["refine"]["clock_filter_iqd"],
+        date_inference = config["refine"]["date_inference"]
+    shell:
+        """
+        augur refine \
+            --tree {input.tree} \
+            --alignment {input.alignment} \
+            --metadata {input.metadata} \
+            --output-tree {output.tree} \
+            --timetree \
+            --clock-filter-iqd {params.clock_filter_iqd}
+        """
+
 rule tree_untangle:
     message:
         """untangling tree branches"""
     input:
-        tree_with_G = build_dir + "/{a_or_b}/{build_name}/tree_raw_with.nwk",
-        tree_without_G = build_dir + "/{a_or_b}/{build_name}/tree_raw_without.nwk"
+        tree_with_G = build_dir + "/{a_or_b}/{build_name}/tree_with_refined.nwk",
+        tree_without_G = build_dir + "/{a_or_b}/{build_name}/tree_without_refined.nwk"
     output:
         untangled_with_G = build_dir + "/{a_or_b}/{build_name}/tree_with_resolve.nwk",
         untangled_without_G = build_dir + "/{a_or_b}/{build_name}/tree_without_resolve.nwk"
@@ -209,31 +236,23 @@ rule tree_untangle:
         --outputrest {output.untangled_with_G}
         """
 
-rule refine:
+rule branch_lengths:
     message:
         """
         Refining tree
           - estimate timetree
         """
     input:
-        tree = build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_resolve.nwk",
-        alignment = rules.tree.input.alignment,
-        metadata = rules.filter.input.metadata
+        tree = build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_resolve.nwk"
     output:
-        tree = build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_refined.nwk",
         node_data = build_dir + "/{a_or_b}/{build_name}/branch_lengths_{with_or_without}.json"
     shell:
         """
-        augur refine \
+        python3 scripts/make-branch-lengths.py \
             --tree {input.tree} \
-            --alignment {input.alignment} \
-            --metadata {input.metadata} \
-            --output-tree {output.tree} \
             --output-node-data {output.node_data} \
-            --no-covariance \
-            --keep-polytomies \
-            --keep-root 
         """
+
 
 rule ancestral:
     message:
@@ -242,7 +261,7 @@ rule ancestral:
           - inferring ambiguous mutations
         """
     input:
-        tree = build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_refined.nwk",
+        tree = build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_resolve.nwk",
         alignment = rules.alignment_for_tree.output.aligned_for_tree
     output:
         node_data = build_dir + "/{a_or_b}/{build_name}/{with_or_without}nt_muts.json"
@@ -261,7 +280,7 @@ rule ancestral:
 rule translate:
     message: "Translating amino acid sequences"
     input:
-        tree =  build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_refined.nwk",
+        tree =  build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_resolve.nwk",
         node_data = rules.ancestral.output.node_data,
         reference = rules.newreference.output.newreferencegbk
     output:
@@ -281,7 +300,7 @@ rule translate:
 
 rule traits:
     input:
-        tree = rules.refine.output.tree,
+        tree =  build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_resolve.nwk",
         metadata = rules.filter.input.metadata
     output:
         node_data = build_dir + "/{a_or_b}/{build_name}/{with_or_without}traits.json"
@@ -302,7 +321,7 @@ rule traits:
 rule clades:
     message: "Adding internal clade labels"
     input:
-        tree = rules.refine.output.tree,
+        tree =  build_dir + "/{a_or_b}/{build_name}/tree_{with_or_without}_resolve.nwk",
         aa_muts = rules.translate.output.node_data,
         nuc_muts = rules.ancestral.output.node_data,
         clades = "config/clades_G_{a_or_b}.tsv"

@@ -8,6 +8,8 @@ buildstorun: ["genome"]
 
 description: "config/description.md"
 
+exclude: "config/dropped_strains.txt"
+
 subtypes: ['b', 'a']
 
 filter:
